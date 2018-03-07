@@ -1,0 +1,836 @@
+MAPTIME030 / geodata in R
+========================================================
+author: GreenStat - Peter van Horssen
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+width:  2000
+height: 1200
+
+
+Introduction - Who am I
+========================================================
+
+
+Peter van Horssen [www.greenstat.nl] ( https:www.greenstat.nl)
+
+background in physical geography & ecology  
+experience in data analysis/statistics/mapping in ecological studies
+  - animal tagging studies
+  - impact assessment studies
+  - data visualisation
+  
+
+analysis : statistics, GIS, graphs, maps
+
+
+Introduction - What is the Plan ?
+========================================================
+* Intro
+ + geo-data in R
+
+
+* Basics:  
+  + convert non-spatial tot spatial data in R
+
+  
+>do stuff yourself
+
+.... coffee break ....
+
+* Analysis:
+  + reading and writing 
+  + some examples
+ 
+>do more stuff yourself
+
+
+geo-data in R
+========================================================
+<!-- what is R ? -->
+
+Why GIS in R ?  
+or maybe start with : why R?
+
+
+- R is a usefull big box with all tools needed for data-analysis  
+- R is not better than other tools 
+- R does not make your data-analysis problem easier/simple !  
+
+- **creation of reproducible workflow**   
+- **scripting and documentation of workflow**
+  
+
+- Recently a boost in the available 'spatial' tools (based on 'simple features')  
+
+All **spatial analysis** functionality (and more!) is available in R,   **plotting** and **layout** for maps is at a basic level.
+
+
+
+
+
+
+
+geo-data in R
+========================================================
+
+what is geo-data?
+- not all data is  geodata
+- formats (xlsx,csv, shp,gml,kml,.....)
+- meta-data (map projection, units)
+
+
+***
+
+
+![](figs/excel_example.png)
+
+
+
+geo-data in R
+========================================================
+
+'simple features' is a data model with basic features for all spatial data:
+- *ISO standard for a common storage and access model of mostly two-dimensional geometries (point, line, polygon, multi-point, multi-line, etc.) used by geographic information systems*. [link]  (https://cran.r-project.org/web/packages/sf/vignettes/sf1.html) 
+
+This standard is 'under the hood' used in nearly all GIS packages (QGis, Esri, PostGIS, ..)
+
+it also exports all OGC operations:  
+  st_area, st_buffer, st_length, st_transform,....
+
+read/write through GDAL
+
+***
+
+![](unnamed-chunk-20-1.png)
+
+
+geo-data in R
+========================================================
+
+- why do we need this ?
+- who needs this  ?  
+
+r&d for small to midsize (in terms of data) analysis    
+
+very usefull for data-exploration (spatial, temporal, attributes)    
+
+>keep the workflow on one platform  
+
+analysis in R, fancy (web)mapping somewhere else   
+
+***
+
+
+<div align="center">
+<img src="figs/workflow_pre.png" width=800 height=600>
+<img src="figs/workflow_post.png" width=800 height=600>
+</div>
+
+<!-- geo-data in R -->
+<!-- ======================================================== -->
+
+
+<!-- ![](figs/workflow_pre.png)   -->
+<!-- ![](figs/workflow_post.png)   -->
+
+
+geo-data in R
+========================================================
+Assume user with basic knowledge of R
+  > data.frame, x[] , str()
+  
+User with workable knowledge of spatial analysis and map projections  
+
+This presentation provides 'pointers' only 
+
+
+
+
+geo-data in R
+========================================================
+
+Software:  R-core   
+
+
+packages : 
+- sf : package to handle spatial vector data efficiently (https://r-spatial.github.io/sf/)   
+      (mac users : check website)
+
+- tidyverse : 'all you can eat' data exploration tools (https://www.tidyverse.org/packages/)
+   +  ggplot : graphs in every form
+   + dplyr : tools for data manipulation
+   + much more but we skip that for now 
+
+- mapview : https://r-spatial.github.io/mapview/articles/index.html
+
+>Please download this before the meetup, R lives @  cran : https://cran.r-project.org/bin/windows/base/
+
+>Package are installed when R is running, choose 'Package|Install Packages' in the topbar, choose a cloudsource and select package name  
+
+Run scripts in plain R of RStudio (newest version)
+
+Non spatial > spatial data
+========================================================
+test set 
+ simple example: points with coordinates
+
+```{r, echo=FALSE}
+
+library(tidyverse)
+
+# xmin: 3.360782 ymin: 50.72349 xmax: 7.227095 ymax: 53.55458
+
+n=10^3
+
+df <- data.frame(
+  ID=c(1:n),
+  var2=runif(n),
+  var1=sample(LETTERS[1:4], n, replace=TRUE),
+  dates=sample(seq(as.Date('2016/01/01'), as.Date('2017/01/01'), by="day"), n, replace=TRUE),
+  X  = runif(n, min= 3.36,max= 7.23), # why this min/max?
+  Y  = runif(n, min=50.72,max=53.55)
+  )
+#df <- data.frame(ID,var1,var2,X,Y)
+
+#df %>% summary()
+
+```
+
+
+```{r, echo=TRUE, evaluate=FALSE}
+
+
+# script voor test df
+n=10^3
+
+df <- data.frame(
+  ID=c(1:n),
+  var2=runif(n),
+  var1=sample(LETTERS[1:4], n, replace=TRUE),
+  dates=sample(seq(as.Date('2016/01/01'), as.Date('2017/01/01'), by="day"), n, replace=TRUE),
+  X  = runif(n, min= 3.36,max= 7.23), # why this min/max?
+  Y  = runif(n, min=50.72,max=53.55)
+  )
+
+head(df)
+
+```
+
+
+Non spatial > spatial data
+========================================================
+
+
+```{r, echo=TRUE}
+library(sf)
+
+df.sf <- st_as_sf(df,coords=c('X','Y'))
+
+df.sf
+
+#st_as_sf(df,coords=c('X','Y','var2'), dim="XYZ")
+#head(df.sf,n=2)
+#head(df,n=2)
+```
+
+Non spatial > spatial data
+========================================================
+
+mapprojection - **metadata**
+
+- basic principle: transformation from sphere to a flat surface
+- formula to project coordinates on a sphere to coordinates on a flat surface, choose centre of   map projection ('datum'), important voor units: **area, distance**
+- map projections in PROJ.4 and import/export through GDAL 
+
+  for Netherlands: 
+  - [RD-coordinate system]  (https://nl.wikipedia.org/wiki/Rijksdriehoeksco%C3%B6rdinaten) (meters) : crs 28992
+  - [WGS84 coordinate system for GPS data] (https://nl.wikipedia.org/wiki/WGS_84) (geografische graden) : crs 4326
+  - [UTM31 Universele Transversale Mercator projectie] (https://nl.wikipedia.org/wiki/Universele_transversale_mercatorprojectie) (meters) : crs 32631
+
+>in **sf** map projections through CRS (Coordinate Reference System) at http://spatialreference.org/
+
+
+***
+
+![](Projectieprincipe.PNG)
+![](Projectiesoorten.png)
+
+
+
+
+Non spatial > spatial data
+========================================================
+```{r echo=TRUE}
+
+df.sf <- st_as_sf(df,coords=c('X','Y'), crs=4326)
+
+df.sf
+# st_transform(df.sf, 28992)
+# st_crs(df.sf)
+# st_set_csr(df.sf)  # error !
+# st_set_crs(df.sf, 28992 ) # is this oke ?
+```
+
+
+
+Non spatial > spatial data
+========================================================
+
+```{r, echo=TRUE}
+str(df.sf) # str : shows structure of object
+
+str(df)
+```
+
+objects keep 'dataframe' class
+
+Non spatial > spatial data
+=======================
+
+```{r, echo=TRUE, eval=TRUE}
+
+df.sf[1:3,] # first three rows of dataframe
+#df.sf[,3]
+df.sf[1:3,2:3] # first three rows and column 2 and 3 only
+```` 
+
+
+Non spatial > spatial data
+========================================================
+```{r, eval=FALSE,fig.align='center'}
+library(mapview) # R wrapper for leaflet .....
+
+
+#mapview(df.sf)
+mapview(df.sf,zcol="var1", legend=TRUE)
+
+
+#library(tmap)
+#tmap_mode("view")
+#tm_shape(df.sf) + tm_dots(col="black", size=.1)
+
+```
+
+***
+
+![](figs/df_example_mapview01.png)
+
+
+Non spatial > data exploration `tidy-style`
+========================================================
+www.tidyverse.org/packages/
+
+use of 'pipes' : '%>%'
+
+select : select column  
+filter : filter rows  
+mutate : add column (and mutate value)  
+summarize : aggregate 
+
+
+```{r, echo=TRUE}
+
+library(tidyverse)
+df <- df %>% mutate(maand=format.Date(dates, "%m"))
+df %>% head()
+df %>% filter(var1=="B" ) %>% head()
+```
+
+
+Non spatial > data exploration `tidy-style`
+========================================================
+
+```{r, echo=TRUE,fig.width=10,fig.height=11}
+
+df %>% 
+ggplot(aes(x=dates,y=ID)) +
+  geom_point() + 
+  #geom_line() +
+  theme(text = element_text(size = 25))
+
+```
+
+***
+
+```{r, echo=TRUE,fig.width=10,fig.height=11}
+df %>%
+  ggplot(aes(x=maand,y=var2, group=maand)) +
+  geom_boxplot()+ 
+  theme(text = element_text(size = 25))
+```
+
+Non spatial > data exploration `tidy-style`
+========================================================
+use data.frame ...
+```{r, echo=TRUE,fig.width=10,fig.height=11}
+# conditional plot
+df %>% ggplot(aes(var1,var2)) +
+  geom_boxplot() +
+  facet_wrap(~maand) +  
+  theme(text = element_text(size = 25))
+```
+
+***
+
+remember the classes of a sf object : 'sf' and 'data.frame'?
+
+```{r, echo=TRUE,fig.width=10,fig.height=11}
+df.sf %>%
+  mutate(maand=format.Date(dates, "%m")) %>% 
+  ggplot(aes(var1,var2)) +
+  geom_boxplot() +
+  facet_wrap(~maand) +            
+  theme(text = element_text(size = 25))
+```
+
+
+
+
+spatial > data exploration `tidy-style`
+========================================================
+```{r, eval=FALSE,fig.align='center'}
+
+library(mapview) # R wrapper for leaflet .....
+
+df.sf %>%
+  mutate(maand=format.Date(dates, "%m")) %>%
+  filter((var1=="B") %>% 
+  mapview(zcol="maand", legend=TRUE)
+
+   
+  
+# alternative ....
+
+#library(tmap)
+#tmap_mode("view")
+#df.sf %>% tm_shape() + tm_dots(col="black", size=.1)
+
+```
+
+***
+
+![](figs/df_example_mapview02.png)
+
+
+
+
+geo-data in R : break
+=======================
+
+ 
+> do stuff yourself ....
+
+
+...coffee break...
+
+
+
+geo-data in R : import/export external GIS-formats 
+========================================================
+
+maps downloaded from web
+https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische%20data/wijk-en-buurtkaart-2017
+CBS : buurt_2017.zip
+- kaart met wijken, buurten en gemeenten in NL
+- uitpakken: shape files
+
+```{r}
+list.files("../dataUtrecht/buurt_2017")
+```
+
+Utrecht : bomenkaart.zip
+ https://utrecht.dataplatform.nl/dataset/afa19ac8-e63e-4e27-a42e-3bb4f9082c59
+- kaart met bomen in utrecht
+- uitpakken : shapefile met bomen in Utrecht
+
+```{r}
+list.files("../dataUtrecht/bomenkaart")
+```
+
+
+
+geo-data in R :  data
+=======================
+
+
+```{r}
+library(sf)
+library(tidyverse)
+buurt.sf <- st_read("../dataUtrecht/buurt_2017/buurt_2017.shp")
+
+#buurt.sf %>% head(n=3)
+```
+
+
+geo-data in R :  data
+=======================
+
+
+```{r}
+library(sf)
+library(tidyverse)
+
+buurt.sf %>% str() # show structure of object
+```
+
+
+geo-data in R :  data
+=======================
+
+
+```{r}
+library(sf)
+library(tidyverse)
+
+u.buurt.sf <-
+  buurt.sf %>% filter(GM_NAAM=='Utrecht') %>% select(GM_NAAM,BU_NAAM,AANT_INW)
+               # filter gemeente Utrecht
+               # selecteer alleen de kolommen GM_NAAM, BU_NAAM,AANT_INW
+
+u.buurt.sf %>% head(n=3)
+
+```
+
+
+geo-data in R :  data
+=======================
+
+
+```{r, eval=FALSE}
+library(sf)
+library(tidyverse)
+library(mapview)
+
+#u.buurt.sf %>% mapview()
+#u.buurt.sf %>% mapview(zcol="BU_NAAM")
+u.buurt.sf %>% mapview(fill=NA)
+
+
+# okay save this for later...
+
+st_write(u.buurt.sf, "u_buurt.kml")
+#st_write(u.buurt.sf, "u_buurt.gml")
+#st_write(u.buurt.sf, "u_buurt.shp")
+#st_write(u.buurt.sf, "u.buurt.GeoJSON")
+
+# st_drivers() for possible formats
+
+# write/read straight in postgres db!
+
+# library(RpostgreSQL)
+# conn <- dbCOnnect(PostgreSQL(),dbname='your_db_name', user='your_user_name')
+# st_write_db(conn, u.buurt.sf, 'your_table_name')
+
+
+```
+
+***
+
+![](figs/buurt_map02.png)
+
+
+
+
+geo-data in R : explore bomen data
+=======================
+
+
+```{r}
+library(sf)
+library(tidyverse)
+bomen.sf <- st_read("../dataUtrecht/bomenkaart/Bomen_GISIB_ArcGISonline.shp")
+
+#bomen.sf %>% head(n=3)
+```
+
+
+geo-data in R : explore bomen data
+=======================
+
+
+```{r}
+library(sf)
+library(tidyverse)
+
+bomen.sf %>% str()
+
+```
+
+nice, bomen data also has 'Wijk' en 'Buurt' ...
+
+geo-data in R : explore bomen data
+=======================
+
+
+```{r,fig.width=15,fig.height=11}
+library(sf)
+library(tidyverse)
+
+bomen.sf %>%
+  ggplot(aes(Plantjaar)) +
+  geom_histogram(binwidth=10) + 
+  theme(text = element_text(size = 25))
+```
+
+***
+```{r,fig.width=15,fig.height=11}
+library(sf)
+library(tidyverse)
+
+bomen.sf %>%
+  ggplot(aes(2018-Plantjaar)) +
+  geom_histogram(binwidth=10) +
+  theme(text = element_text(size = 25))
+```
+
+geo-data in R : explore bomen data
+=======================
+
+```{r,fig.width=15,fig.height=11}
+library(sf)
+library(tidyverse)
+
+bomen.sf %>% 
+  ggplot(aes(2018-Plantjaar, fill=Eigenaar)) + 
+  geom_histogram(binwidth=25) + 
+  theme(text = element_text(size = 25))
+
+```
+
+***
+
+<!-- ```{r,fig.width=15,fig.height=11} -->
+<!-- library(sf) -->
+<!-- library(tidyverse) -->
+
+<!-- bomen.sf %>% -->
+<!--   ggplot(aes(2018-Plantjaar, fill=Eigenaar)) + -->
+<!--   geom_bar(binwidth=25) +  -->
+<!--   facet_wrap(~Wijk,scales="free_y") + -->
+<!--   theme(text = element_text(size = 25)) -->
+
+<!-- ``` -->
+
+
+geo-data in R : analysis
+=======================
+select trees > 100 yr
+
+```{r}
+library(sf)
+library(tidyverse)
+library(mapview)
+
+bomen100.sf <- bomen.sf %>% 
+      mutate (leeftijd = 2018 - Plantjaar) %>% 
+      filter(leeftijd>100) %>% 
+      select(Naam_NL,Eigenaar,leeftijd)
+
+bomen100.sf  %>% head()
+
+#bomen100.sf %>% mapview(cex="leeftijd") +mapview(u.buurt.sf, fill=NA)
+#
+# 'cex' controles size of dots, bigger dots for older trees
+#
+```` 
+
+geo-data in R : spatial join
+=======================
+
+
+spatial join with **st_join**
+
+```{r}
+
+library(sf)
+library(tidyverse)
+library(mapview)
+
+
+bomen100_inw_ubuurt.sf <-
+bomen100.sf %>%
+  st_join(u.buurt.sf) 
+
+bomen100_inw_ubuurt.sf %>% head(n=2)
+````
+
+
+
+
+
+
+geo-data in R : db join
+=======================
+
+database join with **left_join**
+
+```{r,  eval=FALSE,fig.width=15,fig.height=11}
+library(sf)
+library(tidyverse)
+library(mapview)
+
+# left_join is for 'sp' join 'df' only, 
+#'sp' left_join 'sp' gives err
+
+bomen_per_buurt.df <-   
+bomen100_inw_ubuurt.sf %>%
+  st_set_geometry(NULL) %>%   
+    # drop the geometry column
+  group_by(BU_NAAM) %>%      
+    # group by 'BU_NAAM
+  summarize(n=n())          
+    # summarize with function
+
+    # n = number of cases
+    # sum, mean, min, max, median,
+    # first, last ...
+
+u.buurt.sf %>%
+  left_join(bomen_per_buurt.df, by=c('BU_NAAM'='BU_NAAM')) %>%
+  mapview(zcol="n", at=c(1,10,100,250,500), legend=TRUE)
+ # head()
+
+```
+
+***
+
+![](figs/result_map01.png)
+
+
+geo-data in R : db join
+=======================
+
+join table to spatial object
+
+```{r,  eval=FALSE,fig.width=15,fig.height=11}
+
+library(sf)
+library(tidyverse)
+library(mapview)
+
+u.buurt.sf %>%
+  left_join(bomen_per_buurt.df) %>%
+  mutate(boom_per_100 = n/(AANT_INW/100)) %>%
+           # aantal oude bomen per 100 inwoners 
+  mapview(zcol="boom_per_100",
+          at=c(0,1,10,100,250),
+          legend=TRUE) + 
+  mapview(bomen100.sf, cex="leeftijd")
+  #head()  
+
+```
+
+***
+
+![](figs/result_map03.png)
+ 
+ spatial analysis
+=======================
+>do stuff yourself
+
+
+
+
+
+
+Extra examples : Non spatial > data exploration `tidy-style`
+========================================================
+
+```{r, echo=TRUE,fig.width=10,fig.height=11}
+# summarize
+df %>% 
+  group_by(maand,var1) %>%
+  summarize(median_var2=median(var2))
+
+```
+
+***
+
+```{r, echo=TRUE,fig.width=10,fig.height=11}
+# conditional plot
+df %>% 
+  group_by(maand,var1) %>%
+  summarize(median_var2=median(var2)) %>%
+  ggplot() +
+    geom_point(aes(var1,median_var2),size=2) +
+    facet_wrap(~maand) +  
+    theme(text = element_text(size = 25))
+
+
+```
+
+
+
+Extra examples : Non spatial > data exploration `tidy-style`
+========================================================
+
+
+```{r, echo=TRUE,fig.width=10,fig.height=11}
+df %>% 
+  group_by(maand) %>% 
+  mutate(mean_var2=mean(var2)) %>%
+  ggplot() +
+    geom_boxplot(aes(var1,var2)) +
+    geom_hline(aes(yintercept=mean_var2), col='red') +
+    facet_wrap(~maand) +  
+    theme(text = element_text(size = 25))
+```
+
+
+Extra examples : spatial > data exploration `tidy-style`
+========================================================
+extra ....
+
+```{r,  echo=TRUE,fig.width=10,fig.height=11}
+
+library(sf)
+library(tidyverse)
+
+u.buurt.sf %>% mutate(area = st_area(geometry)) %>% head(n=3)
+## note the geometry field
+```
+
+Extra examples : spatial > data exploration `tidy-style`
+========================================================
+extra ....
+
+```{r,  echo=TRUE,fig.width=10,fig.height=11}
+library(sf)
+library(tidyverse)
+
+u.buurt.sf %>%
+  filter (BU_NAAM=='Oog in Al') %>% st_area()
+
+# go from  multipolygon to polygon to line ....
+u.buurt.sf %>%
+  filter (BU_NAAM=='Oog in Al') %>%
+  st_cast('POLYGON') %>% # st_area()
+  st_cast('LINESTRING') %>% st_length()
+# note the warnings ...
+```
+
+Extra examples : spatial > data exploration `tidy-style`
+========================================================
+extra ....
+
+```{r, evaluate=FALSE, fig.width=15,fig.height=15}
+
+#u.buurt.sf %>%
+#  filter (BU_NAAM=='Oog in Al') %>%
+#  st_buffer(100) %>% mapview(fill=NA)  + mapview(u.buurt.sf %>% filter (BU_NAAM=='Oog in Al'))
+
+#  st_buffer value can also be negative ...
+
+
+```
+
+
+![](figs/result_map_extra02.png)
+
+
+
+
+
+
+
+
+
